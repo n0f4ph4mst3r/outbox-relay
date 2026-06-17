@@ -1,0 +1,34 @@
+# Ignore Go build artifacts and caches
+*.exe
+*.test
+*.prof
+vendor/ 
+
+
+# Ignore common development and editor files
+.git
+.gitignore
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*~
+Thumbs.db
+
+# Ignore Docker-related files (except Dockerfile itself)
+docker-compose.yml
+docker-compose.*.yml
+
+# Ignore documentation and temporary files
+docs/
+temp/
+tmp/
+*.log
+*.bak
+
+# Ignore environment variables and sensitive information
+.env
+.env.*
+
+# Ignore config files
+config/*

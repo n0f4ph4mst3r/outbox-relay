@@ -1,0 +1,87 @@
+services:
+  outbox:
+    container_name: outbox-relay
+    build:
+      context: .
+      dockerfile: dockerfile
+    image: ghcr.io/n0f4ph4mst3r/outbox-relay:latest
+    environment:
+      CONFIG_PATH: /config/config.yaml
+      DATABASE_URL: "${DATABASE_URL}"
+      BROKER_URL: "${BROKER_URL}"
+    volumes:
+      - ${HOST_CONFIG_PATH}:/config/config.yaml:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      db-migrator:
+        condition: service_completed_successfully
+      redpanda:
+        condition: service_healthy
+      topic-init:
+        condition: service_completed_successfully
+
+  postgres:
+    image: postgres:18-alpine
+    container_name: outbox_db
+    environment:
+      POSTGRES_USER: "${POSTGRES_USER}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+      POSTGRES_DB: "${POSTGRES_DB}"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      start_period: 15s
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - pgdata:/var/lib/postgresql
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT}:5432"
+  
+  db-migrator:
+    build:
+      context: .
+      dockerfile: migrator.Dockerfile
+    container_name: outbox_migrator
+    environment:
+      DATABASE_URL: "${DATABASE_URL}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["${DATABASE_URL}", "up"]
+
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:v26.1.10
+    container_name: outbox_broker
+    command:
+      - redpanda start
+      - --kafka-addr internal://0.0.0.0:9092
+      - --advertise-kafka-addr internal://redpanda:9092
+      - --mode dev-container
+      - --smp 1
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster health | grep -q healthy"]
+      start_period: 10s
+      interval: 5s
+      retries: 5
+    volumes:
+      - redpanda-data:/var/lib/redpanda/data
+
+  topic-init:
+    image: docker.redpanda.com/redpandadata/redpanda:v26.1.10
+    container_name: redpanda-init
+    entrypoint: ["/bin/sh", "-c"]
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    command: 
+      - "rpk topic create OutboxEvent --brokers redpanda:9092 --partitions 3 --replicas 1 || true"
+
+networks:
+  outbox-local-network:
+    driver: bridge
+
+volumes:
+  pgdata:
+  redpanda-data:

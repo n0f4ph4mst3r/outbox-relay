@@ -1,0 +1,45 @@
+services:
+  test-postgres:
+    image: postgres:18-alpine
+    container_name: outbox_db_test
+    environment:
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "qwerty"
+      POSTGRES_DB: "test"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d test"]
+      start_period: 15s
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - pgdata:/var/lib/postgresql
+    ports:
+      - "127.0.0.1:5432:5432"
+
+  test-redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:v26.1.10
+    container_name: outbox_broker_test
+    command:
+      - redpanda start
+      - --kafka-addr internal://0.0.0.0:9092,external://0.0.0.0:9093
+      - --advertise-kafka-addr internal://redpanda:9092,external://localhost:9093
+      - --mode dev-container
+      - --smp 1
+    ports:
+      - "127.0.0.1:9093:9093" 
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster health | grep -q healthy"]
+      start_period: 10s
+      interval: 5s
+      retries: 5
+    volumes:
+      - redpanda-data:/var/lib/redpanda/data
+
+networks:
+  outbox-test-network:
+    driver: bridge
+
+volumes:
+  pgdata:
+  redpanda-data:

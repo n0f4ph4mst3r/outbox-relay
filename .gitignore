@@ -1,0 +1,8 @@
+# Ignore environment variables and sensitive information
+.env
+.env.*
+!.env.sample
+
+# Ignore config files
+config/*
+!config/sample.yaml
